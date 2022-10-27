@@ -14,8 +14,9 @@ namespace sqlfunction
 {
     public static class GetProduct
     {
-        [FunctionName("GetProduct")]
-        public static async Task<IActionResult> Run(
+        //functie care rezulta lista tuturor itemilor
+        [FunctionName("GetProducts")]
+        public static async Task<IActionResult> RunProducts(
             [HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequest req,
             ILogger log)
         {
@@ -25,7 +26,7 @@ namespace sqlfunction
 
             _connection.Open();
 
-            SqlCommand _sqlcommand = new SqlCommand(_statement,_connection);
+            SqlCommand _sqlcommand = new SqlCommand(_statement, _connection);
 
             using (SqlDataReader _reader = _sqlcommand.ExecuteReader())
             {
@@ -47,8 +48,43 @@ namespace sqlfunction
 
         private static SqlConnection GetConnection()
         {
-            string connectionString = "Server=tcp:appserverccg.database.windows.net,1433;Initial Catalog=appdb;Persist Security Info=False;User ID=sqladmin;Password=Azurepassword1);MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;";
+            string connectionString = Environment.GetEnvironmentVariable("SQLAZURECONNSTR_SQLConnectionString");
             return new SqlConnection(connectionString);
+        }
+
+        [FunctionName("GetProduct")]
+        public static async Task<IActionResult> RunProduct(
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = null)] HttpRequest req,
+            ILogger log)
+        {
+            int productId = int.Parse(req.Query["id"]);
+            string _statement = String.Format("SELECT ProductID,ProductName,Quantity FROM Products WHERE ProductId={0}", productId);
+            SqlConnection _connection = GetConnection();
+
+            _connection.Open();
+
+            SqlCommand _sqlcommand = new SqlCommand(_statement, _connection);
+            Product product = new Product();
+
+            try
+            {
+                using (SqlDataReader _reader = _sqlcommand.ExecuteReader())
+                {
+                    _reader.Read();
+                    product.ProductID = _reader.GetInt32(0);
+                    product.ProductName = _reader.GetString(1);
+                    product.Quantity = _reader.GetInt32(2);
+                    var response = product;
+                    _connection.Close();
+                    return new OkObjectResult(response);
+                }
+            }
+            catch (Exception e)
+            {
+                var response = "No records found";
+                _connection.Close();
+                return new OkObjectResult(response);
+            }
         }
     }
 }
